@@ -18,7 +18,7 @@
 //!
 //! To an observer (a user or author) of the network the state of
 //! the network during forking conditions can be thought of as a quantum superposition of possible next states.
-//! The auxiliary PoW alllows miners (CAUTION! miners are no longer block authors in this context)
+//! The auxiliary PoW alllows aux miners (CAUTION! aux "miners" are not block authors)
 //! to signal their support for one of the forks before the next block is included, and incentivises
 //! block authors to choose that fork to collect their transaction rewards.
 //!
@@ -78,7 +78,7 @@ decl_storage! {
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
 		/// Some auxiliary proof of work was included in the chain.
-		/// Data are: New Work, AccumulatedWork, Beneficiary
+		/// Data are: New Work, Accumulated Work, Beneficiary
 		WorkNoted(u64, u64, AccountId),
 	}
 );
@@ -111,7 +111,7 @@ decl_module! {
 
 			//TODO Count how many zeros of work they did.
 			let zeros: u32 = 5;
-			
+
 			// Make sure they're above the minimum
 			ensure!(zeros >= T::MinRightZeros::get(), Error::<T>::WorkHarderNextTime);
 
