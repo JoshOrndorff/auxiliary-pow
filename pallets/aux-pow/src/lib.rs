@@ -53,17 +53,18 @@ mod tests;
 /// The seal that is submitted to prove that work was done. The beneficiary is included here to
 /// prevent front-running.
 #[derive(Encode, Decode, RuntimeDebug, Eq, PartialEq, Hash, Clone)]
-pub struct Seal<T: Config> {
-	parent: T::Hash,
-	beneficiary: T::AccountId,
+pub struct Seal<Hash, AccountId> {
+	parent: Hash,
+	beneficiary: AccountId,
 	nonce: u64,
 }
+type SealOf<T> = Seal<<T as frame_system::Config>::Hash, <T as frame_system::Config>::AccountId>;
 
 /// Auxiliary PoW's configuration trait.
 pub trait Config: frame_system::Config {
 	/// Because this pallet emits events, it depends on the runtime's definition of an event.
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-	/// Minimum nomber of right-zeros the hash must have to be accepted.
+	/// Minimum number of right-zeros the hash must have to be accepted.
 	type MinRightZeros: Get<u32>;
 }
 
@@ -101,7 +102,7 @@ decl_module! {
 
 		/// Submit an auxiliary proof of work.
 		#[weight = 0]
-		pub fn note_work(origin, seal: Seal<T>) -> dispatch::DispatchResult {
+		pub fn note_work(origin, seal: SealOf<T>) -> dispatch::DispatchResult {
 			ensure_none(origin)?;
 
 			// Make sure they are mining on the parent
