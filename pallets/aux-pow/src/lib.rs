@@ -43,6 +43,8 @@ use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch,
 use frame_system::{ensure_none};
 use codec::{Encode, Decode};
 use sp_runtime::RuntimeDebug;
+use sp_core::{U256, H256};
+use sha3::{Digest, Sha3_256};
 
 #[cfg(test)]
 mod mock;
@@ -64,8 +66,8 @@ type SealOf<T> = Seal<<T as frame_system::Config>::Hash, <T as frame_system::Con
 pub trait Config: frame_system::Config {
 	/// Because this pallet emits events, it depends on the runtime's definition of an event.
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-	/// Minimum number of right-zeros the hash must have to be accepted.
-	type MinRightZeros: Get<u32>;
+	/// Minimum number of leading zero bits the hash must have to be accepted.
+	type MinLeftZeros: Get<u32>;
 }
 
 decl_storage! {
@@ -87,7 +89,9 @@ decl_error! {
 	pub enum Error for Module<T: Config> {
 		/// The Parent block supplied is not this blocks parent.
 		IncorrectParent,
-		/// The hash does not have enough right zeros to be considered.
+		/// The number of zeros the submitter claimed is below the minimum.
+		ClaimedWorkInsufficient,
+		/// The actual hash does not have as many zeros as claimed.
 		WorkHarderNextTime,
 	}
 }
@@ -102,25 +106,42 @@ decl_module! {
 
 		/// Submit an auxiliary proof of work.
 		#[weight = 0]
-		pub fn note_work(origin, seal: SealOf<T>) -> dispatch::DispatchResult {
+		pub fn note_work(origin, seal: SealOf<T>, zeros_of_work: u32) -> dispatch::DispatchResult {
 			ensure_none(origin)?;
 
+			// Make sure they're above the minimum difficulty
+			ensure!(
+				zeros_of_work >= T::MinLeftZeros::get(),
+				Error::<T>::ClaimedWorkInsufficient
+			);
+
 			// Make sure they are mining on the parent
-			let actual_parent = frame_system::Module::<T>::parent_hash();
-			ensure!(seal.parent == actual_parent, Error::<T>::IncorrectParent);
+			ensure!(
+				seal.parent == frame_system::Module::<T>::parent_hash(),
+				Error::<T>::IncorrectParent
+			);
 
-			//TODO Count how many zeros of work they did.
-			let zeros: u32 = 5;
+			// Ensure the seal has as many zeros as they claimed
+			seal.using_encoded(|bytes| {
 
-			// Make sure they're above the minimum
-			ensure!(zeros >= T::MinRightZeros::get(), Error::<T>::WorkHarderNextTime);
+				// Do the hashing
+				let result = U256::from(&H256::from_slice(Sha3_256::digest(bytes).as_slice())[..]);
+
+				// Hmm this comparison doesn't see to work.
+				// In recipes, Wei checks the threshold by multiplying and checking for overflow.
+				ensure!(
+					result < (U256::max_value() >> zeros_of_work),
+					Error::<T>::WorkHarderNextTime
+				);
+				Ok(result)
+			});
 
 			// Update accumulated work.
-			let delta_work = u64::pow(2, zeros);
+			let delta_work = u64::pow(2, zeros_of_work);
 			let new_work = AccumulatedWork::get() + delta_work;
 			AccumulatedWork::put(new_work);
 
-			//TODO reward the beneficiary
+			//TODO reward (or maybe just note via a hook) the beneficiary
 
 			// Emit an event.
 			Self::deposit_event(RawEvent::WorkNoted(delta_work, new_work, seal.beneficiary));

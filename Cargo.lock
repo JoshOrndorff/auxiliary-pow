@@ -3719,6 +3719,7 @@ dependencies = [
  "frame-system",
  "parity-scale-codec",
  "serde",
+ "sha3",
  "sp-core",
  "sp-io",
  "sp-runtime",
