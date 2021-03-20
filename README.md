@@ -22,7 +22,7 @@ The Auxiliary PoW pallet allows EIP-1011-style hybrids in reverse. That is to sa
 
 The Auxiliary PoW pallet enables a pure PoW chain where the leader election PoW is entirely orthogonal to the finality PoW.Using a separate PoW for finality has several advantages over recycling the leader election PoW.
 
-Firstly, miners who exceed a minimum threshold hashrate are reliably able to contribute work to the chain's finality. This avoids the wasted work that is orphaned off in classical PoW chains.
+Firstly, miners who exceed a minimum threshold hashrate are reliably able to contribute work to the chain's finality. This avoids the wasted work that is orphaned off in classical PoW chains, as well as the centralization around mining pools.
 
 Secondly, finality flows in gradually as work accumulates in the transaction pool. This helps miners converge on the "best" chain to mine before the next block is authored.
 
