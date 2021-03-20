@@ -43,8 +43,8 @@ use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch,
 use frame_system::{ensure_none};
 use codec::{Encode, Decode};
 use sp_runtime::RuntimeDebug;
-use sp_core::{U256, H256};
-use sha3::{Digest, Sha3_256};
+use sp_core::U256;
+use sp_io::hashing::blake2_256;
 
 #[cfg(test)]
 mod mock;
@@ -68,6 +68,9 @@ pub trait Config: frame_system::Config {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 	/// Minimum number of leading zero bits the hash must have to be accepted.
 	type MinLeftZeros: Get<u32>;
+
+	//TODO Hook to notify when work is added (for rewards for example)
+	//TODO Way to add additional work (in case leader election PoW is used and should be counted)
 }
 
 decl_storage! {
@@ -121,22 +124,19 @@ decl_module! {
 				Error::<T>::IncorrectParent
 			);
 
-			// Ensure the seal has as many zeros as they claimed
-			seal.using_encoded(|bytes| {
-
-				// Do the hashing
-				let result = U256::from(&H256::from_slice(Sha3_256::digest(bytes).as_slice())[..]);
-
-				// Hmm this comparison doesn't see to work.
-				// In recipes, Wei checks the threshold by multiplying and checking for overflow.
-				ensure!(
-					result < (U256::max_value() >> zeros_of_work),
-					Error::<T>::WorkHarderNextTime
-				);
-				Ok(result)
+			// Compute the actual hash of the seal passed in
+			let hash = seal.using_encoded(|bytes| {
+				U256::from(&blake2_256(bytes))
 			});
 
+			// Ensure that the hash is as low as the submitter claimed
+			ensure!(
+				512 - hash.bits() >= zeros_of_work as usize,
+				Error::<T>::WorkHarderNextTime
+			);
+
 			// Update accumulated work.
+			// Check this calculation. Do I need zeros + 1?
 			let delta_work = u64::pow(2, zeros_of_work);
 			let new_work = AccumulatedWork::get() + delta_work;
 			AccumulatedWork::put(new_work);
